@@ -1,24 +1,39 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../templates/header.php';
 
-$documentId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-
-if ($documentId <= 0) {
-    echo '<div class="alert alert-warning">Documento no encontrado.</div>';
-    require_once __DIR__ . '/../templates/footer.php';
+$documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if (!$documentId) {
+    header('Location: /documents/index.php');
     exit;
 }
 
 try {
-    $stmt = $pdo->prepare('SELECT * FROM documents WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT * FROM documents WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $documentId]);
     $document = $stmt->fetch();
 
     if (!$document) {
+        require_once __DIR__ . '/../templates/header.php';
         echo '<div class="alert alert-warning">Documento no encontrado.</div>';
+        echo '<a class="btn btn-secondary" href="/documents/index.php">Volver a la lista</a>';
         require_once __DIR__ . '/../templates/footer.php';
         exit;
+    }
+
+    if (empty($document['public_token'])) {
+        $generateToken = static function (int $length = 40): string {
+            $length = max(2, $length);
+            $bytes = (int) ceil($length / 2);
+            return substr(bin2hex(random_bytes($bytes)), 0, $length);
+        };
+
+        $newToken = $generateToken(40);
+        $updateTokenStmt = $pdo->prepare('UPDATE documents SET public_token = :token WHERE id = :id');
+        $updateTokenStmt->execute([
+            ':token' => $newToken,
+            ':id' => $documentId,
+        ]);
+        $document['public_token'] = $newToken;
     }
 
     $itemsStmt = $pdo->prepare('SELECT * FROM document_items WHERE document_id = :id ORDER BY id ASC');
@@ -31,6 +46,7 @@ try {
         $payStmt->execute([':document_id' => $documentId]);
         $paymentsTotal = (float) ($payStmt->fetchColumn() ?? 0);
     } catch (PDOException $e) {
+        error_log('Error al obtener pagos: ' . $e->getMessage());
         $paymentsTotal = 0.0;
     }
 
@@ -58,22 +74,6 @@ try {
     $isEstimate = ($document['doc_type'] === 'estimate');
     $isInvoice = ($document['doc_type'] === 'invoice');
 
-    if (empty($document['public_token'])) {
-        $generateToken = static function (int $length = 40): string {
-            $length = max(2, $length);
-            $bytes = (int) ceil($length / 2);
-            return substr(bin2hex(random_bytes($bytes)), 0, $length);
-        };
-
-        $newToken = $generateToken(40);
-        $updateTokenStmt = $pdo->prepare('UPDATE documents SET public_token = :token WHERE id = :id');
-        $updateTokenStmt->execute([
-            ':token' => $newToken,
-            ':id' => $documentId,
-        ]);
-        $document['public_token'] = $newToken;
-    }
-
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? '';
     $publicUrl = $scheme . '://' . $host . '/public/document.php?t=' . urlencode($document['public_token']);
@@ -97,6 +97,8 @@ try {
     $taxDisplay = ($document['tax'] ?? null) !== null ? (float) $document['tax'] : round($subtotalDisplay * ($ivaPercent / 100), 2);
     $totalDisplay = ($document['total'] ?? null) !== null ? (float) $document['total'] : round($subtotalDisplay + $taxDisplay, 2);
     $saldoPendiente = max(0, $totalDisplay - $paymentsTotal);
+
+    require_once __DIR__ . '/../templates/header.php';
 ?>
 <div class="invoice-page">
     <div class="row mb-3 align-items-center">
@@ -295,7 +297,12 @@ if (btnInternal && navigator.clipboard) {
 
 <?php
 } catch (PDOException $e) {
+    error_log('Error al cargar documento: ' . $e->getMessage());
+    require_once __DIR__ . '/../templates/header.php';
     echo '<div class="alert alert-danger">Ocurrió un error al cargar el documento.</div>';
+    echo '<a class="btn btn-secondary" href="/documents/index.php">Volver a la lista</a>';
+    require_once __DIR__ . '/../templates/footer.php';
+    exit;
 }
 
 require_once __DIR__ . '/../templates/footer.php';
