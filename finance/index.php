@@ -11,7 +11,7 @@ $expenses = [];
 $error = false;
 
 try {
-    $ingresosStmt = $pdo->query('SELECT COALESCE(SUM(amount), 0) AS total FROM payments');
+    $ingresosStmt = $pdo->query('SELECT COALESCE(SUM(p.amount), 0) AS total FROM payments p JOIN documents d ON d.id = p.document_id AND d.is_deleted = 0');
     $summary['ingresos'] = (float) ($ingresosStmt->fetchColumn());
 
     $gastosStmt = $pdo->query('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses');
@@ -19,7 +19,7 @@ try {
 
     $summary['balance'] = $summary['ingresos'] - $summary['gastos'];
 
-    $paymentsStmt = $pdo->query('SELECT p.*, d.doc_code, d.client_name FROM payments p LEFT JOIN documents d ON p.document_id = d.id ORDER BY p.payment_date DESC, p.id DESC LIMIT 10');
+    $paymentsStmt = $pdo->query('SELECT p.*, d.doc_code, d.client_name FROM payments p JOIN documents d ON p.document_id = d.id AND d.is_deleted = 0 ORDER BY p.payment_date DESC, p.id DESC LIMIT 10');
     $payments = $paymentsStmt->fetchAll();
 
     $expensesStmt = $pdo->query('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC LIMIT 10');
@@ -97,7 +97,13 @@ require_once __DIR__ . '/../templates/header.php';
                                     <?php foreach ($payments as $payment): ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($payment['payment_date']); ?></td>
-                                            <td><?php echo $payment['doc_code'] ? htmlspecialchars($payment['doc_code']) : '(Sin documento)'; ?></td>
+                                            <td>
+                                                <?php if (!empty($payment['doc_code'])): ?>
+                                                    <a href="/documents/view.php?id=<?php echo (int) $payment['document_id']; ?>"><?php echo htmlspecialchars($payment['doc_code']); ?></a>
+                                                <?php else: ?>
+                                                    (Sin documento)
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo htmlspecialchars($payment['client_name'] ?? ''); ?></td>
                                             <td class="text-end fw-semibold"><?php echo number_format((float) $payment['amount'], 2); ?></td>
                                         </tr>

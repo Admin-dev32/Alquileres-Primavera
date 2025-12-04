@@ -24,6 +24,51 @@ try {
     $products = [];
 }
 
+ $documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+ $editing = false;
+ $documentData = [
+     'client_name' => '',
+     'client_company' => '',
+     'client_address' => '',
+     'client_phone' => '',
+     'representative' => '',
+     'event_type' => '',
+     'document_date' => $today,
+     'rental_end_date' => '',
+     'notes' => '',
+ ];
+ $existingItems = [];
+
+ if ($documentId) {
+     try {
+         $docStmt = $pdo->prepare('SELECT * FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
+         $docStmt->execute([':id' => $documentId]);
+         $found = $docStmt->fetch();
+         if ($found) {
+             $editing = true;
+             $docType = $found['doc_type'];
+             $title = $docType === 'invoice' ? 'Editar Factura' : 'Editar Estimado';
+             $documentData = [
+                 'client_name' => $found['client_name'] ?? '',
+                 'client_company' => $found['client_company'] ?? '',
+                 'client_address' => $found['client_address'] ?? '',
+                 'client_phone' => $found['client_phone'] ?? '',
+                 'representative' => $found['representative'] ?? '',
+                 'event_type' => $found['event_type'] ?? '',
+                 'document_date' => $found['document_date'] ?? $today,
+                 'rental_end_date' => $found['rental_end_date'] ?? '',
+                 'notes' => $found['notes'] ?? '',
+             ];
+
+             $itemsLoadStmt = $pdo->prepare('SELECT item_name, quantity, unit_price, rental_days FROM document_items WHERE document_id = :id ORDER BY id ASC');
+             $itemsLoadStmt->execute([':id' => $documentId]);
+             $existingItems = $itemsLoadStmt->fetchAll();
+         }
+     } catch (PDOException $e) {
+         // si falla la carga seguimos con formulario vacío
+     }
+ }
+
 require_once __DIR__ . '/../templates/header.php';
 ?>
 
@@ -32,6 +77,9 @@ require_once __DIR__ . '/../templates/header.php';
 
 <form action="save.php" method="POST" class="mb-5">
   <input type="hidden" name="doc_type" value="<?php echo htmlspecialchars($docType); ?>">
+  <?php if ($editing): ?>
+    <input type="hidden" name="id" value="<?php echo (int) $documentId; ?>">
+  <?php endif; ?>
 
   <div class="card mb-4 shadow-sm">
     <div class="card-body">
@@ -39,19 +87,19 @@ require_once __DIR__ . '/../templates/header.php';
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="client_name">Nombre del cliente</label>
-          <input type="text" id="client_name" name="client_name" class="form-control form-control-lg" required>
+          <input type="text" id="client_name" name="client_name" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['client_name']); ?>" required>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="client_company">Empresa (opcional)</label>
-          <input type="text" id="client_company" name="client_company" class="form-control form-control-lg">
+          <input type="text" id="client_company" name="client_company" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['client_company']); ?>">
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="client_address">Dirección</label>
-          <input type="text" id="client_address" name="client_address" class="form-control form-control-lg">
+          <input type="text" id="client_address" name="client_address" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['client_address']); ?>">
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="client_phone">Teléfono</label>
-          <input type="text" id="client_phone" name="client_phone" class="form-control form-control-lg">
+          <input type="text" id="client_phone" name="client_phone" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['client_phone']); ?>">
         </div>
       </div>
     </div>
@@ -63,19 +111,19 @@ require_once __DIR__ . '/../templates/header.php';
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="representative">Representante</label>
-          <input type="text" id="representative" name="representative" class="form-control form-control-lg">
+          <input type="text" id="representative" name="representative" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['representative']); ?>">
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="event_type">Tipo de evento</label>
-          <input type="text" id="event_type" name="event_type" class="form-control form-control-lg">
+          <input type="text" id="event_type" name="event_type" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['event_type']); ?>">
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="document_date">Fecha del documento</label>
-          <input type="date" id="document_date" name="document_date" class="form-control form-control-lg" value="<?php echo $today; ?>" required>
+          <input type="date" id="document_date" name="document_date" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['document_date']); ?>" required>
         </div>
         <div class="col-md-6">
           <label class="form-label fw-semibold" for="rental_end_date">Día de finalización del alquiler</label>
-          <input type="date" id="rental_end_date" name="rental_end_date" class="form-control form-control-lg">
+          <input type="date" id="rental_end_date" name="rental_end_date" class="form-control form-control-lg" value="<?php echo htmlspecialchars($documentData['rental_end_date']); ?>">
         </div>
       </div>
     </div>
@@ -139,7 +187,7 @@ require_once __DIR__ . '/../templates/header.php';
       <h5 class="card-title mb-3">Notas</h5>
       <div class="mb-3">
         <label class="form-label fw-semibold" for="notes">Notas</label>
-        <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Escribe detalles adicionales..."></textarea>
+        <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Escribe detalles adicionales..."><?php echo htmlspecialchars($documentData['notes']); ?></textarea>
       </div>
       <div class="d-flex gap-3">
         <button type="submit" class="btn btn-primary btn-lg">Guardar documento</button>
@@ -152,6 +200,7 @@ require_once __DIR__ . '/../templates/header.php';
 <script>
   const IVA_PERCENT = <?php echo json_encode($ivaPercent); ?>;
   const PRODUCT_LIST = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
+  const EXISTING_ITEMS = <?php echo json_encode($existingItems, JSON_UNESCAPED_UNICODE); ?>;
   let itemIndex = 0;
 
   function createInput({ type, name, classes = '', step, min, readOnly = false }) {
@@ -165,7 +214,7 @@ require_once __DIR__ . '/../templates/header.php';
     return input;
   }
 
-  function addItemRow() {
+  function addItemRow(data = {}) {
     const tbody = document.getElementById('items-body');
     const row = document.createElement('tr');
     const currentIndex = itemIndex++;
@@ -177,6 +226,7 @@ require_once __DIR__ . '/../templates/header.php';
       classes: 'form-control form-control-sm item-name',
     });
     descInput.setAttribute('list', 'productList');
+    descInput.value = data.item_name ? data.item_name : '';
     descCell.appendChild(descInput);
 
     const qtyCell = document.createElement('td');
@@ -187,6 +237,7 @@ require_once __DIR__ . '/../templates/header.php';
       step: '0.01',
       min: '0',
     });
+    qtyInput.value = data.quantity !== undefined ? data.quantity : '';
     qtyCell.appendChild(qtyInput);
 
     const daysCell = document.createElement('td');
@@ -197,7 +248,7 @@ require_once __DIR__ . '/../templates/header.php';
       step: '1',
       min: '1',
     });
-    daysInput.value = 1;
+    daysInput.value = data.rental_days && Number(data.rental_days) > 0 ? data.rental_days : 1;
     daysCell.appendChild(daysInput);
 
     const priceCell = document.createElement('td');
@@ -208,6 +259,7 @@ require_once __DIR__ . '/../templates/header.php';
       step: '0.01',
       min: '0',
     });
+    priceInput.value = data.unit_price !== undefined ? data.unit_price : '';
     priceCell.appendChild(priceInput);
 
     const totalCell = document.createElement('td');
@@ -218,6 +270,7 @@ require_once __DIR__ . '/../templates/header.php';
       step: '0.01',
       readOnly: true,
     });
+    totalInput.value = data.line_total !== undefined ? Number(data.line_total).toFixed(2) : '';
     totalCell.appendChild(totalInput);
 
     const deleteCell = document.createElement('td');
@@ -304,7 +357,11 @@ require_once __DIR__ . '/../templates/header.php';
   });
 
   document.addEventListener('DOMContentLoaded', () => {
-    addItemRow();
+    if (Array.isArray(EXISTING_ITEMS) && EXISTING_ITEMS.length > 0) {
+      EXISTING_ITEMS.forEach(item => addItemRow(item));
+    } else {
+      addItemRow();
+    }
     recalcDocumentTotals();
   });
 </script>

@@ -18,7 +18,7 @@ if (!in_array($status, $allowedStatus, true)) {
 $documents = [];
 $errorLoading = false;
 
-$sql = "SELECT * FROM documents WHERE 1=1";
+$sql = "SELECT * FROM documents WHERE is_deleted = 0";
 $params = [];
 
 if ($type !== 'all') {
@@ -139,8 +139,10 @@ if ($errorLoading) {
                 <td><?php echo htmlspecialchars($doc['client_name']); ?></td>
                 <td><?php echo htmlspecialchars($doc['document_date']); ?></td>
                 <td><?php echo number_format((float)$doc['total'], 2, '.', ''); ?></td>
-                <td>
+                <td class="d-flex flex-wrap gap-1">
                   <a class="btn btn-sm btn-primary" href="/documents/view.php?id=<?php echo urlencode($doc['id']); ?>">Ver</a>
+                  <a class="btn btn-sm btn-outline-primary" href="/documents/form.php?id=<?php echo urlencode($doc['id']); ?>">Editar</a>
+                  <a class="btn btn-sm btn-outline-danger" href="/documents/delete.php?id=<?php echo urlencode($doc['id']); ?>" onclick="return confirm('¿Seguro que deseas eliminar este documento?');">Eliminar</a>
                 </td>
               </tr>
             <?php endforeach; ?>

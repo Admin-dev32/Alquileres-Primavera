@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS documents (
   doc_code VARCHAR(50),
   public_token VARCHAR(64),
   status ENUM('draft','sent','paid','cancelled') DEFAULT 'draft',
+  is_deleted TINYINT(1) NOT NULL DEFAULT 0,
   document_date DATE NOT NULL,
   client_name VARCHAR(255) NOT NULL,
   client_company VARCHAR(255),
@@ -66,7 +67,7 @@ CREATE TABLE IF NOT EXISTS payments (
   document_id INT NOT NULL,
   payment_date DATE NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
-  method VARCHAR(50),
+  method VARCHAR(50) NOT NULL,
   notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE

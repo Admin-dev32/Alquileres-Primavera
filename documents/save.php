@@ -7,14 +7,21 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    try {
-        $pdo->exec('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS rental_days INT NOT NULL DEFAULT 1');
-    } catch (PDOException $e) {
-        // ignore if column already exists or cannot be altered here
-    }
+    $documentId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
     $docType = trim($_POST['doc_type'] ?? '');
     $validTypes = ['estimate', 'invoice'];
+
+    if ($documentId) {
+        $existingStmt = $pdo->prepare('SELECT * FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
+        $existingStmt->execute([':id' => $documentId]);
+        $existingDoc = $existingStmt->fetch();
+        if (!$existingDoc) {
+            throw new Exception('Documento no encontrado.');
+        }
+        $docType = $existingDoc['doc_type'];
+    }
+
     if (!in_array($docType, $validTypes, true)) {
         throw new Exception('Tipo de documento inválido.');
     }
@@ -87,39 +94,64 @@ try {
     $tax = round($subtotal * ($ivaPercent / 100), 2);
     $total = round($subtotal + $tax, 2);
 
-    $stmt = $pdo->prepare('SELECT MAX(doc_number) AS max_num FROM documents WHERE doc_type = :doc_type');
-    $stmt->execute([':doc_type' => $docType]);
-    $row = $stmt->fetch();
-    $docNumber = isset($row['max_num']) && $row['max_num'] !== null ? ((int) $row['max_num']) + 1 : 1;
-
-    $prefix = $docType === 'invoice' ? 'FAC-' : 'EST-';
-    $docCode = $prefix . str_pad((string) $docNumber, 4, '0', STR_PAD_LEFT);
-    $status = $docType === 'invoice' ? 'sent' : 'draft';
-
     $pdo->beginTransaction();
 
-    $insertDocument = $pdo->prepare('INSERT INTO documents (doc_type, doc_number, doc_code, status, document_date, client_name, client_company, client_address, client_phone, representative, event_type, rental_end_date, subtotal, tax, total, notes) VALUES (:doc_type, :doc_number, :doc_code, :status, :document_date, :client_name, :client_company, :client_address, :client_phone, :representative, :event_type, :rental_end_date, :subtotal, :tax, :total, :notes)');
+    if ($documentId) {
+        $statusToKeep = $existingDoc['status'];
 
-    $insertDocument->execute([
-        ':doc_type' => $docType,
-        ':doc_number' => $docNumber,
-        ':doc_code' => $docCode,
-        ':status' => $status,
-        ':document_date' => $documentDate,
-        ':client_name' => $clientName,
-        ':client_company' => $clientCompany,
-        ':client_address' => $clientAddress,
-        ':client_phone' => $clientPhone,
-        ':representative' => $representative,
-        ':event_type' => $eventType,
-        ':rental_end_date' => $rentalEndDate !== '' ? $rentalEndDate : null,
-        ':subtotal' => $subtotal,
-        ':tax' => $tax,
-        ':total' => $total,
-        ':notes' => $notes,
-    ]);
+        $updateDocument = $pdo->prepare('UPDATE documents SET client_name = :client_name, client_company = :client_company, client_address = :client_address, client_phone = :client_phone, representative = :representative, event_type = :event_type, document_date = :document_date, rental_end_date = :rental_end_date, subtotal = :subtotal, tax = :tax, total = :total, notes = :notes, status = :status WHERE id = :id');
 
-    $documentId = $pdo->lastInsertId();
+        $updateDocument->execute([
+            ':client_name' => $clientName,
+            ':client_company' => $clientCompany,
+            ':client_address' => $clientAddress,
+            ':client_phone' => $clientPhone,
+            ':representative' => $representative,
+            ':event_type' => $eventType,
+            ':document_date' => $documentDate,
+            ':rental_end_date' => $rentalEndDate !== '' ? $rentalEndDate : null,
+            ':subtotal' => $subtotal,
+            ':tax' => $tax,
+            ':total' => $total,
+            ':notes' => $notes,
+            ':status' => $statusToKeep,
+            ':id' => $documentId,
+        ]);
+
+        $pdo->prepare('DELETE FROM document_items WHERE document_id = :id')->execute([':id' => $documentId]);
+    } else {
+        $stmt = $pdo->prepare('SELECT MAX(doc_number) AS max_num FROM documents WHERE doc_type = :doc_type');
+        $stmt->execute([':doc_type' => $docType]);
+        $row = $stmt->fetch();
+        $docNumber = isset($row['max_num']) && $row['max_num'] !== null ? ((int) $row['max_num']) + 1 : 1;
+
+        $prefix = $docType === 'invoice' ? 'FAC-' : 'EST-';
+        $docCode = $prefix . str_pad((string) $docNumber, 4, '0', STR_PAD_LEFT);
+        $status = $docType === 'invoice' ? 'sent' : 'draft';
+
+        $insertDocument = $pdo->prepare('INSERT INTO documents (doc_type, doc_number, doc_code, status, document_date, client_name, client_company, client_address, client_phone, representative, event_type, rental_end_date, subtotal, tax, total, notes) VALUES (:doc_type, :doc_number, :doc_code, :status, :document_date, :client_name, :client_company, :client_address, :client_phone, :representative, :event_type, :rental_end_date, :subtotal, :tax, :total, :notes)');
+
+        $insertDocument->execute([
+            ':doc_type' => $docType,
+            ':doc_number' => $docNumber,
+            ':doc_code' => $docCode,
+            ':status' => $status,
+            ':document_date' => $documentDate,
+            ':client_name' => $clientName,
+            ':client_company' => $clientCompany,
+            ':client_address' => $clientAddress,
+            ':client_phone' => $clientPhone,
+            ':representative' => $representative,
+            ':event_type' => $eventType,
+            ':rental_end_date' => $rentalEndDate !== '' ? $rentalEndDate : null,
+            ':subtotal' => $subtotal,
+            ':tax' => $tax,
+            ':total' => $total,
+            ':notes' => $notes,
+        ]);
+
+        $documentId = $pdo->lastInsertId();
+    }
 
     $insertItem = $pdo->prepare('INSERT INTO document_items (document_id, item_name, unit_price, quantity, rental_days, line_total) VALUES (:document_id, :item_name, :unit_price, :quantity, :rental_days, :line_total)');
 
@@ -143,5 +175,5 @@ try {
         $pdo->rollBack();
     }
     echo 'Ocurrió un error al guardar el documento.';
-    // echo '<!-- ' . htmlspecialchars($e->getMessage()) . ' -->';
+    error_log('Error al guardar documento: ' . $e->getMessage());
 }
