@@ -19,11 +19,6 @@ try {
         exit;
     }
 
-    if ($document['status'] === 'draft') {
-        echo 'Este documento no está disponible públicamente.';
-        exit;
-    }
-
     $itemsStmt = $pdo->prepare('SELECT * FROM document_items WHERE document_id = :id ORDER BY id ASC');
     $itemsStmt->execute([':id' => $document['id']]);
     $items = $itemsStmt->fetchAll();

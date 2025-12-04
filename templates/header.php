@@ -20,7 +20,7 @@
                 <li class="nav-item"><a class="nav-link" href="/documents/index.php">Documentos</a></li>
                 <li class="nav-item"><a class="nav-link" href="/items/index.php">Artículos / Productos</a></li>
                 <li class="nav-item"><a class="nav-link" href="/finance/index.php">Finanzas</a></li>
-                <li class="nav-item"><a class="nav-link" href="/settings.php">Configuración</a></li>
+                <li class="nav-item"><a class="nav-link" href="/settings/index.php">Configuración</a></li>
             </ul>
         </div>
     </div>

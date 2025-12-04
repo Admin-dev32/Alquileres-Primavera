@@ -18,7 +18,7 @@ try {
 
 $products = [];
 try {
-    $productsStmt = $pdo->query('SELECT id, name, unit_price FROM items ORDER BY name ASC');
+    $productsStmt = $pdo->query('SELECT id, name, unit_price AS price FROM items ORDER BY name ASC');
     $products = $productsStmt->fetchAll();
 } catch (PDOException $e) {
     $products = [];
@@ -105,7 +105,7 @@ require_once __DIR__ . '/../templates/header.php';
       </div>
       <datalist id="productList">
         <?php foreach ($products as $product): ?>
-          <option value="<?php echo htmlspecialchars($product['name']); ?>" data-price="<?php echo htmlspecialchars($product['unit_price']); ?>"></option>
+          <option value="<?php echo htmlspecialchars($product['name']); ?>" data-id="<?php echo (int) $product['id']; ?>" data-price="<?php echo htmlspecialchars($product['price']); ?>"></option>
         <?php endforeach; ?>
       </datalist>
     </div>
@@ -151,7 +151,7 @@ require_once __DIR__ . '/../templates/header.php';
 
 <script>
   const IVA_PERCENT = <?php echo json_encode($ivaPercent); ?>;
-  const PRODUCT_LIST = <?php echo json_encode($products); ?>;
+  const PRODUCT_LIST = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
   let itemIndex = 0;
 
   function createInput({ type, name, classes = '', step, min, readOnly = false }) {
@@ -183,7 +183,7 @@ require_once __DIR__ . '/../templates/header.php';
     const qtyInput = createInput({
       type: 'number',
       name: `items[${currentIndex}][quantity]`,
-      classes: 'form-control form-control-sm text-end',
+      classes: 'form-control form-control-sm text-end item-qty',
       step: '0.01',
       min: '0',
     });
@@ -204,7 +204,7 @@ require_once __DIR__ . '/../templates/header.php';
     const priceInput = createInput({
       type: 'number',
       name: `items[${currentIndex}][unit_price]`,
-      classes: 'form-control form-control-sm text-end',
+      classes: 'form-control form-control-sm text-end item-price',
       step: '0.01',
       min: '0',
     });
@@ -227,23 +227,23 @@ require_once __DIR__ . '/../templates/header.php';
     deleteBtn.textContent = 'Eliminar';
     deleteBtn.addEventListener('click', () => {
       row.remove();
-      recalculateTotals();
+      recalcDocumentTotals();
     });
     deleteCell.appendChild(deleteBtn);
 
     [descCell, qtyCell, daysCell, priceCell, totalCell, deleteCell].forEach(cell => row.appendChild(cell));
     tbody.appendChild(row);
 
-    qtyInput.addEventListener('input', recalculateTotals);
-    priceInput.addEventListener('input', recalculateTotals);
-    daysInput.addEventListener('input', recalculateTotals);
+    qtyInput.addEventListener('input', recalcDocumentTotals);
+    priceInput.addEventListener('input', recalcDocumentTotals);
+    daysInput.addEventListener('input', recalcDocumentTotals);
     descInput.addEventListener('change', () => {
       fillProductPrice(descInput, priceInput);
-      recalculateTotals();
+      recalcDocumentTotals();
     });
     descInput.addEventListener('blur', () => {
       fillProductPrice(descInput, priceInput);
-      recalculateTotals();
+      recalcDocumentTotals();
     });
   }
 
@@ -252,7 +252,7 @@ require_once __DIR__ . '/../templates/header.php';
     if (!value) return;
     const match = PRODUCT_LIST.find(prod => (prod.name || '').toLowerCase() === value);
     if (match && priceInput) {
-      priceInput.value = parseFloat(match.unit_price).toFixed(2);
+      priceInput.value = parseFloat(match.price).toFixed(2);
     }
   }
 
@@ -283,9 +283,29 @@ require_once __DIR__ . '/../templates/header.php';
     totalInput.value = total.toFixed(2);
   }
 
+  function recalcDocumentTotals() {
+    recalculateTotals();
+  }
+
+  document.addEventListener('input', function (e) {
+    if (!e.target.classList.contains('item-name')) return;
+    const input = e.target;
+    const value = input.value.trim();
+    if (!value) return;
+    const product = PRODUCT_LIST.find(p => p.name === value);
+    if (!product) return;
+    const row = input.closest('tr');
+    if (!row) return;
+    const priceInput = row.querySelector('.item-price') || row.querySelector("input[name*='[unit_price]']");
+    if (priceInput) {
+      priceInput.value = product.price;
+    }
+    recalcDocumentTotals();
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     addItemRow();
-    recalculateTotals();
+    recalcDocumentTotals();
   });
 </script>
 
