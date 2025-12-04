@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
+require_login();
+require_permission('edit_documents');
 
 $documentId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 

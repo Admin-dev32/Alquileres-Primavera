@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
+require_login();
+require_permission('delete_documents');
 
 $documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$documentId) {

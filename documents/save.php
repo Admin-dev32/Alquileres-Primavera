@@ -1,13 +1,22 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: /index.php');
     exit;
 }
 
+$documentId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+if ($documentId) {
+    require_login();
+    require_permission('edit_documents');
+} else {
+    require_login();
+    require_permission('create_documents');
+}
+
 try {
-    $documentId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
     $docType = trim($_POST['doc_type'] ?? '');
     $validTypes = ['estimate', 'invoice'];

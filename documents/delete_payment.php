@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
+require_login();
+require_permission('manage_payments');
 
 $paymentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $documentId = filter_input(INPUT_GET, 'document_id', FILTER_VALIDATE_INT);

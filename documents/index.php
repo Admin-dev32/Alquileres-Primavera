@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
+require_login();
+require_permission('view_documents');
 
 $type = isset($_GET['type']) ? trim($_GET['type']) : 'all';
 $status = isset($_GET['status']) ? trim($_GET['status']) : 'all';
@@ -151,8 +154,12 @@ if ($errorLoading) {
                 <td><?php echo number_format((float)$doc['total'], 2, '.', ''); ?></td>
                 <td class="d-flex flex-wrap gap-1">
                   <a class="btn btn-sm btn-primary" href="/documents/view.php?id=<?php echo urlencode($doc['id']); ?>">Ver</a>
-                  <a class="btn btn-sm btn-outline-primary" href="/documents/form.php?id=<?php echo urlencode($doc['id']); ?>">Editar</a>
-                  <a class="btn btn-sm btn-outline-danger" href="/documents/delete.php?id=<?php echo urlencode($doc['id']); ?>" onclick="return confirm('¿Seguro que deseas eliminar este documento?');">Eliminar</a>
+                  <?php if (user_has_permission('edit_documents')): ?>
+                      <a class="btn btn-sm btn-outline-primary" href="/documents/form.php?id=<?php echo urlencode($doc['id']); ?>">Editar</a>
+                  <?php endif; ?>
+                  <?php if (user_has_permission('delete_documents')): ?>
+                      <a class="btn btn-sm btn-outline-danger" href="/documents/delete.php?id=<?php echo urlencode($doc['id']); ?>" onclick="return confirm('¿Seguro que deseas eliminar este documento?');">Eliminar</a>
+                  <?php endif; ?>
                 </td>
               </tr>
             <?php endforeach; ?>

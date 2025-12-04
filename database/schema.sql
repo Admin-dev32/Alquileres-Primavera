@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS settings (
   business_address VARCHAR(255),
   business_phone VARCHAR(50),
   business_whatsapp VARCHAR(50),
+  business_email VARCHAR(255),
   iva_percentage DECIMAL(5,2) NOT NULL DEFAULT 13.00,
+  default_notes TEXT,
+  logo_path VARCHAR(255),
   currency_code VARCHAR(10) DEFAULT 'USD',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -81,5 +84,22 @@ CREATE TABLE IF NOT EXISTS expenses (
   amount DECIMAL(10,2) NOT NULL,
   payment_method VARCHAR(50),
   notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  is_owner TINYINT(1) NOT NULL DEFAULT 0,
+  can_view_documents TINYINT(1) NOT NULL DEFAULT 1,
+  can_create_documents TINYINT(1) NOT NULL DEFAULT 1,
+  can_edit_documents TINYINT(1) NOT NULL DEFAULT 1,
+  can_delete_documents TINYINT(1) NOT NULL DEFAULT 1,
+  can_manage_payments TINYINT(1) NOT NULL DEFAULT 1,
+  can_view_finances TINYINT(1) NOT NULL DEFAULT 1,
+  can_manage_settings TINYINT(1) NOT NULL DEFAULT 1,
+  can_manage_users TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

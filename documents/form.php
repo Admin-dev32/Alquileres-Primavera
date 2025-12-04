@@ -1,5 +1,15 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
+
+$documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if ($documentId) {
+    require_login();
+    require_permission('edit_documents');
+} else {
+    require_login();
+    require_permission('create_documents');
+}
 
 $docType = (isset($_GET['type']) && $_GET['type'] === 'invoice') ? 'invoice' : 'estimate';
 $title = $docType === 'invoice' ? 'Nueva Factura' : 'Nuevo Estimado';

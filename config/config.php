@@ -16,3 +16,6 @@ try {
 } catch (PDOException $e) {
     die('Error al conectar con la base de datos.');
 }
+
+// Asegura que exista el usuario propietario inicial con todos los permisos.
+require_once __DIR__ . '/auth_bootstrap.php';

@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/auth.php';
+require_login();
+require_permission('view_documents');
 
 $documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$documentId) {
@@ -251,7 +254,9 @@ try {
                                 <th class="text-end">Monto</th>
                                 <th>Método</th>
                                 <th>Notas</th>
-                                <th>Acciones</th>
+                                <?php if (user_has_permission('manage_payments')): ?>
+                                    <th>Acciones</th>
+                                <?php endif; ?>
                             </tr>
                         </thead>
                         <tbody>
@@ -261,10 +266,12 @@ try {
                                     <td class="text-end fw-semibold">$<?php echo number_format((float) $payment['amount'], 2); ?></td>
                                     <td><?php echo htmlspecialchars($payment['method']); ?></td>
                                     <td><?php echo nl2br(htmlspecialchars($payment['notes'] ?? '')); ?></td>
-                                    <td class="text-nowrap">
-                                        <a href="/documents/edit_payment.php?id=<?php echo (int) $payment['id']; ?>&document_id=<?php echo (int) $document['id']; ?>" class="btn btn-sm btn-outline-primary">Editar</a>
-                                        <a href="/documents/delete_payment.php?id=<?php echo (int) $payment['id']; ?>&document_id=<?php echo (int) $document['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Seguro que deseas eliminar este pago?');">Eliminar</a>
-                                    </td>
+                                    <?php if (user_has_permission('manage_payments')): ?>
+                                        <td class="text-nowrap">
+                                            <a href="/documents/edit_payment.php?id=<?php echo (int) $payment['id']; ?>&document_id=<?php echo (int) $document['id']; ?>" class="btn btn-sm btn-outline-primary">Editar</a>
+                                            <a href="/documents/delete_payment.php?id=<?php echo (int) $payment['id']; ?>&document_id=<?php echo (int) $document['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Seguro que deseas eliminar este pago?');">Eliminar</a>
+                                        </td>
+                                    <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -282,6 +289,7 @@ try {
                 <?php endif; ?>
             </div>
 
+            <?php if (user_has_permission('manage_payments')): ?>
             <form class="row g-2" method="POST" action="/documents/save_payment.php">
                 <input type="hidden" name="document_id" value="<?php echo (int) $document['id']; ?>">
                 <div class="col-12 col-md-3">
@@ -309,6 +317,7 @@ try {
                     <button type="submit" class="btn btn-success btn-sm" <?php echo $saldoPendiente <= 0 ? 'disabled' : ''; ?>>Guardar pago</button>
                 </div>
             </form>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -323,11 +332,15 @@ try {
 
     <div class="d-flex flex-wrap gap-2 mb-3 no-print">
         <button type="button" class="btn btn-primary" onclick="window.print();">Imprimir</button>
-        <?php if ($isEstimate): ?>
+        <?php if ($isEstimate && user_has_permission('edit_documents')): ?>
             <a href="convert_to_invoice.php?id=<?php echo $documentId; ?>" class="btn btn-warning">Convertir a factura</a>
         <?php endif; ?>
-        <a href="/documents/form.php?id=<?php echo (int) $document['id']; ?>" class="btn btn-outline-primary btn-sm">Editar</a>
-        <a href="/documents/delete.php?id=<?php echo (int) $document['id']; ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Seguro que deseas eliminar este documento?');">Eliminar</a>
+        <?php if (user_has_permission('edit_documents')): ?>
+            <a href="/documents/form.php?id=<?php echo (int) $document['id']; ?>" class="btn btn-outline-primary btn-sm">Editar</a>
+        <?php endif; ?>
+        <?php if (user_has_permission('delete_documents')): ?>
+            <a href="/documents/delete.php?id=<?php echo (int) $document['id']; ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Seguro que deseas eliminar este documento?');">Eliminar</a>
+        <?php endif; ?>
         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCopyPublicLink">Copiar enlace para cliente</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCopyInternalLink">Copiar enlace interno</button>
         <a href="/documents/index.php" class="btn btn-secondary">Volver a la lista</a>
