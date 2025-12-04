@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS settings (
   business_address VARCHAR(255),
   business_phone VARCHAR(50),
   business_whatsapp VARCHAR(50),
-  iva_percent DECIMAL(5,2) DEFAULT 0.00,
+  iva_percentage DECIMAL(5,2) NOT NULL DEFAULT 13.00,
   currency_code VARCHAR(10) DEFAULT 'USD',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS documents (
   doc_type ENUM('estimate','invoice') NOT NULL,
   doc_number INT NOT NULL,
   doc_code VARCHAR(50),
+  public_token VARCHAR(64),
   status ENUM('draft','sent','paid','cancelled') DEFAULT 'draft',
   document_date DATE NOT NULL,
   client_name VARCHAR(255) NOT NULL,
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS document_items (
   item_name VARCHAR(255) NOT NULL,
   unit_price DECIMAL(10,2) NOT NULL,
   quantity DECIMAL(10,2) NOT NULL,
+  rental_days INT NOT NULL DEFAULT 1,
   line_total DECIMAL(10,2) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE

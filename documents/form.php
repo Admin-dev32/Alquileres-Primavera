@@ -1,10 +1,30 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../templates/header.php';
 
 $docType = (isset($_GET['type']) && $_GET['type'] === 'invoice') ? 'invoice' : 'estimate';
 $title = $docType === 'invoice' ? 'Nueva Factura' : 'Nuevo Estimado';
 $today = date('Y-m-d');
+
+$ivaPercent = 13.00;
+try {
+    $settingsStmt = $pdo->query('SELECT iva_percentage FROM settings LIMIT 1');
+    $settingsRow = $settingsStmt->fetch();
+    if ($settingsRow && isset($settingsRow['iva_percentage'])) {
+        $ivaPercent = (float) $settingsRow['iva_percentage'];
+    }
+} catch (PDOException $e) {
+    $ivaPercent = 13.00;
+}
+
+$products = [];
+try {
+    $productsStmt = $pdo->query('SELECT id, name, unit_price FROM items ORDER BY name ASC');
+    $products = $productsStmt->fetchAll();
+} catch (PDOException $e) {
+    $products = [];
+}
+
+require_once __DIR__ . '/../templates/header.php';
 ?>
 
 <h1 class="mb-2"><?php echo htmlspecialchars($title); ?></h1>
@@ -69,25 +89,34 @@ $today = date('Y-m-d');
       </div>
       <p class="text-muted">Agrega los artículos del alquiler (sillas, mesas, manteles, etc.).</p>
       <div class="table-responsive">
-        <table class="table table-bordered align-middle" id="items-table">
+        <table class="table table-striped table-sm align-middle" id="items-table">
           <thead class="table-light">
             <tr>
               <th>Descripción</th>
-              <th style="width: 140px;">Cantidad</th>
-              <th style="width: 160px;">Precio unitario</th>
-              <th style="width: 160px;">Total línea</th>
+              <th style="width: 120px;">Cantidad</th>
+              <th style="width: 120px;">Días</th>
+              <th style="width: 150px;">Precio unitario</th>
+              <th style="width: 150px;">Total línea</th>
               <th style="width: 80px;"></th>
             </tr>
           </thead>
           <tbody id="items-body"></tbody>
         </table>
       </div>
+      <datalist id="productList">
+        <?php foreach ($products as $product): ?>
+          <option value="<?php echo htmlspecialchars($product['name']); ?>" data-price="<?php echo htmlspecialchars($product['unit_price']); ?>"></option>
+        <?php endforeach; ?>
+      </datalist>
     </div>
   </div>
 
   <div class="card mb-4 shadow-sm">
     <div class="card-body">
-      <h5 class="card-title mb-3">Totales</h5>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="card-title mb-0">Totales</h5>
+        <small class="text-muted">IVA aplicado: <?php echo number_format($ivaPercent, 2); ?>% (editable en Configuración)</small>
+      </div>
       <div class="row justify-content-end g-3">
         <div class="col-md-4">
           <label class="form-label fw-semibold" for="subtotal">Subtotal</label>
@@ -121,7 +150,8 @@ $today = date('Y-m-d');
 </form>
 
 <script>
-  const IVA_PERCENT = 13;
+  const IVA_PERCENT = <?php echo json_encode($ivaPercent); ?>;
+  const PRODUCT_LIST = <?php echo json_encode($products); ?>;
   let itemIndex = 0;
 
   function createInput({ type, name, classes = '', step, min, readOnly = false }) {
@@ -144,25 +174,37 @@ $today = date('Y-m-d');
     const descInput = createInput({
       type: 'text',
       name: `items[${currentIndex}][item_name]`,
-      classes: 'form-control form-control-lg',
+      classes: 'form-control form-control-sm item-name',
     });
+    descInput.setAttribute('list', 'productList');
     descCell.appendChild(descInput);
 
     const qtyCell = document.createElement('td');
     const qtyInput = createInput({
       type: 'number',
       name: `items[${currentIndex}][quantity]`,
-      classes: 'form-control form-control-lg text-end',
+      classes: 'form-control form-control-sm text-end',
       step: '0.01',
       min: '0',
     });
     qtyCell.appendChild(qtyInput);
 
+    const daysCell = document.createElement('td');
+    const daysInput = createInput({
+      type: 'number',
+      name: `items[${currentIndex}][rental_days]`,
+      classes: 'form-control form-control-sm text-end rental-days',
+      step: '1',
+      min: '1',
+    });
+    daysInput.value = 1;
+    daysCell.appendChild(daysInput);
+
     const priceCell = document.createElement('td');
     const priceInput = createInput({
       type: 'number',
       name: `items[${currentIndex}][unit_price]`,
-      classes: 'form-control form-control-lg text-end',
+      classes: 'form-control form-control-sm text-end',
       step: '0.01',
       min: '0',
     });
@@ -172,7 +214,7 @@ $today = date('Y-m-d');
     const totalInput = createInput({
       type: 'number',
       name: `items[${currentIndex}][line_total]`,
-      classes: 'form-control form-control-lg text-end',
+      classes: 'form-control form-control-sm text-end',
       step: '0.01',
       readOnly: true,
     });
@@ -189,11 +231,29 @@ $today = date('Y-m-d');
     });
     deleteCell.appendChild(deleteBtn);
 
-    [descCell, qtyCell, priceCell, totalCell, deleteCell].forEach(cell => row.appendChild(cell));
+    [descCell, qtyCell, daysCell, priceCell, totalCell, deleteCell].forEach(cell => row.appendChild(cell));
     tbody.appendChild(row);
 
     qtyInput.addEventListener('input', recalculateTotals);
     priceInput.addEventListener('input', recalculateTotals);
+    daysInput.addEventListener('input', recalculateTotals);
+    descInput.addEventListener('change', () => {
+      fillProductPrice(descInput, priceInput);
+      recalculateTotals();
+    });
+    descInput.addEventListener('blur', () => {
+      fillProductPrice(descInput, priceInput);
+      recalculateTotals();
+    });
+  }
+
+  function fillProductPrice(descInput, priceInput) {
+    const value = descInput.value.trim().toLowerCase();
+    if (!value) return;
+    const match = PRODUCT_LIST.find(prod => (prod.name || '').toLowerCase() === value);
+    if (match && priceInput) {
+      priceInput.value = parseFloat(match.unit_price).toFixed(2);
+    }
   }
 
   function recalculateTotals() {
@@ -206,7 +266,8 @@ $today = date('Y-m-d');
     tbody.querySelectorAll('tr').forEach(row => {
       const qty = parseFloat(row.querySelector("input[name*='[quantity]']")?.value) || 0;
       const price = parseFloat(row.querySelector("input[name*='[unit_price]']")?.value) || 0;
-      const lineTotal = qty * price;
+      const days = parseFloat(row.querySelector("input[name*='[rental_days]']")?.value) || 1;
+      const lineTotal = qty * price * days;
       const lineTotalInput = row.querySelector("input[name*='[line_total]']");
       if (lineTotalInput) {
         lineTotalInput.value = lineTotal.toFixed(2);

@@ -7,6 +7,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    try {
+        $pdo->exec('ALTER TABLE document_items ADD COLUMN IF NOT EXISTS rental_days INT NOT NULL DEFAULT 1');
+    } catch (PDOException $e) {
+        // ignore if column already exists or cannot be altered here
+    }
+
     $docType = trim($_POST['doc_type'] ?? '');
     $validTypes = ['estimate', 'invoice'];
     if (!in_array($docType, $validTypes, true)) {
@@ -36,6 +42,17 @@ try {
         $itemsPosted = [];
     }
 
+    $ivaPercent = 13.0;
+    try {
+        $ivaStmt = $pdo->query('SELECT iva_percentage FROM settings LIMIT 1');
+        $ivaRow = $ivaStmt->fetch();
+        if ($ivaRow && isset($ivaRow['iva_percentage'])) {
+            $ivaPercent = (float) $ivaRow['iva_percentage'];
+        }
+    } catch (PDOException $e) {
+        $ivaPercent = 13.0;
+    }
+
     $validItems = [];
     $subtotal = 0.0;
 
@@ -43,14 +60,19 @@ try {
         $itemName = trim($item['item_name'] ?? '');
         $quantity = isset($item['quantity']) ? (float) $item['quantity'] : 0;
         $unitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : 0;
+        $rentalDays = isset($item['rental_days']) ? (int) $item['rental_days'] : 1;
+        if ($rentalDays < 1) {
+            $rentalDays = 1;
+        }
 
         if ($itemName !== '' && $quantity > 0 && $unitPrice >= 0) {
-            $lineTotal = round($quantity * $unitPrice, 2);
+            $lineTotal = round($quantity * $unitPrice * $rentalDays, 2);
             $subtotal += $lineTotal;
             $validItems[] = [
                 'item_name' => $itemName,
                 'unit_price' => $unitPrice,
                 'quantity' => $quantity,
+                'rental_days' => $rentalDays,
                 'line_total' => $lineTotal,
             ];
         }
@@ -62,7 +84,7 @@ try {
     }
 
     $subtotal = round($subtotal, 2);
-    $tax = round($subtotal * 0.13, 2);
+    $tax = round($subtotal * ($ivaPercent / 100), 2);
     $total = round($subtotal + $tax, 2);
 
     $stmt = $pdo->prepare('SELECT MAX(doc_number) AS max_num FROM documents WHERE doc_type = :doc_type');
@@ -99,7 +121,7 @@ try {
 
     $documentId = $pdo->lastInsertId();
 
-    $insertItem = $pdo->prepare('INSERT INTO document_items (document_id, item_name, unit_price, quantity, line_total) VALUES (:document_id, :item_name, :unit_price, :quantity, :line_total)');
+    $insertItem = $pdo->prepare('INSERT INTO document_items (document_id, item_name, unit_price, quantity, rental_days, line_total) VALUES (:document_id, :item_name, :unit_price, :quantity, :rental_days, :line_total)');
 
     foreach ($validItems as $item) {
         $insertItem->execute([
@@ -107,6 +129,7 @@ try {
             ':item_name' => $item['item_name'],
             ':unit_price' => $item['unit_price'],
             ':quantity' => $item['quantity'],
+            ':rental_days' => $item['rental_days'],
             ':line_total' => $item['line_total'],
         ]);
     }

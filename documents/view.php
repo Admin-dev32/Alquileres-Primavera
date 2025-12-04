@@ -49,14 +49,54 @@ try {
     $businessPhone = $settings['business_phone'] ?? '';
     $businessWhatsapp = $settings['business_whatsapp'] ?? '';
     $businessLogo = $settings['business_logo'] ?? '';
+    $settingsIvaPercent = isset($settings['iva_percentage']) ? (float) $settings['iva_percentage'] : 13.0;
 
     $docLabel = $document['doc_type'] === 'invoice' ? 'FACTURA' : 'ESTIMADO';
     $statusClass = $document['doc_type'] === 'invoice' ? 'text-danger' : 'text-primary';
     $documentDate = $document['document_date'] ?? '';
     $rentalEndDate = $document['rental_end_date'] ?? '';
-    $saldoPendiente = max(0, (float) $document['total'] - $paymentsTotal);
     $isEstimate = ($document['doc_type'] === 'estimate');
     $isInvoice = ($document['doc_type'] === 'invoice');
+
+    if (empty($document['public_token'])) {
+        $generateToken = static function (int $length = 40): string {
+            $length = max(2, $length);
+            $bytes = (int) ceil($length / 2);
+            return substr(bin2hex(random_bytes($bytes)), 0, $length);
+        };
+
+        $newToken = $generateToken(40);
+        $updateTokenStmt = $pdo->prepare('UPDATE documents SET public_token = :token WHERE id = :id');
+        $updateTokenStmt->execute([
+            ':token' => $newToken,
+            ':id' => $documentId,
+        ]);
+        $document['public_token'] = $newToken;
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $publicUrl = $scheme . '://' . $host . '/public/document.php?t=' . urlencode($document['public_token']);
+
+    $calculatedSubtotal = 0.0;
+    foreach ($items as $calcItem) {
+        $calcQty = isset($calcItem['quantity']) ? (float) $calcItem['quantity'] : 0;
+        $calcPrice = isset($calcItem['unit_price']) ? (float) $calcItem['unit_price'] : 0;
+        $calcDays = isset($calcItem['rental_days']) ? (int) $calcItem['rental_days'] : 1;
+        if ($calcDays < 1) {
+            $calcDays = 1;
+        }
+        $calculatedSubtotal += $calcQty * $calcPrice * $calcDays;
+    }
+    $calculatedSubtotal = round($calculatedSubtotal, 2);
+
+    $ivaPercent = ($document['subtotal'] ?? 0) > 0
+        ? round(((float) $document['tax'] / max((float) $document['subtotal'], 0.01)) * 100, 2)
+        : $settingsIvaPercent;
+    $subtotalDisplay = $calculatedSubtotal > 0 ? $calculatedSubtotal : (float) ($document['subtotal'] ?? 0);
+    $taxDisplay = ($document['tax'] ?? null) !== null ? (float) $document['tax'] : round($subtotalDisplay * ($ivaPercent / 100), 2);
+    $totalDisplay = ($document['total'] ?? null) !== null ? (float) $document['total'] : round($subtotalDisplay + $taxDisplay, 2);
+    $saldoPendiente = max(0, $totalDisplay - $paymentsTotal);
 ?>
 <div class="invoice-page">
     <div class="row mb-3 align-items-center">
@@ -113,6 +153,7 @@ try {
                         <tr>
                             <th>Descripción</th>
                             <th class="text-end">Cantidad</th>
+                            <th class="text-end">Días</th>
                             <th class="text-end">Precio unitario</th>
                             <th class="text-end">Total línea</th>
                         </tr>
@@ -120,15 +161,23 @@ try {
                     <tbody>
                         <?php if (count($items) === 0): ?>
                             <tr>
-                                <td colspan="4" class="text-center">No hay artículos registrados.</td>
+                                <td colspan="5" class="text-center">No hay artículos registrados.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($items as $item): ?>
+                                <?php
+                                    $itemDays = isset($item['rental_days']) ? (int) $item['rental_days'] : 1;
+                                    if ($itemDays < 1) {
+                                        $itemDays = 1;
+                                    }
+                                    $lineTotalCalc = (float) $item['unit_price'] * (float) $item['quantity'] * $itemDays;
+                                ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($item['item_name']); ?></td>
                                     <td class="text-end"><?php echo htmlspecialchars($item['quantity']); ?></td>
+                                    <td class="text-end"><?php echo htmlspecialchars($itemDays); ?></td>
                                     <td class="text-end">$<?php echo number_format((float) $item['unit_price'], 2); ?></td>
-                                    <td class="text-end">$<?php echo number_format((float) $item['line_total'], 2); ?></td>
+                                    <td class="text-end">$<?php echo number_format($lineTotalCalc, 2); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -144,15 +193,15 @@ try {
                 <div class="card-body py-2">
                     <div class="d-flex justify-content-between mb-1">
                         <span class="fw-bold">Subtotal:</span>
-                        <span>$<?php echo number_format((float) $document['subtotal'], 2); ?></span>
+                        <span>$<?php echo number_format($subtotalDisplay, 2); ?></span>
                     </div>
                     <div class="d-flex justify-content-between mb-1">
-                        <span class="fw-bold">IVA:</span>
-                        <span>$<?php echo number_format((float) $document['tax'], 2); ?></span>
+                        <span class="fw-bold">IVA (<?php echo number_format($ivaPercent, 2); ?>%):</span>
+                        <span>$<?php echo number_format($taxDisplay, 2); ?></span>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span class="fw-bold">Total:</span>
-                        <span class="fw-bold">$<?php echo number_format((float) $document['total'], 2); ?></span>
+                        <span class="fw-bold">$<?php echo number_format($totalDisplay, 2); ?></span>
                     </div>
                 </div>
             </div>
@@ -191,7 +240,8 @@ try {
         <?php if ($isEstimate): ?>
             <a href="convert_to_invoice.php?id=<?php echo $documentId; ?>" class="btn btn-warning">Convertir a factura</a>
         <?php endif; ?>
-        <button type="button" class="btn btn-outline-secondary" id="btnCopyLink">Copiar enlace</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCopyPublicLink">Copiar enlace para cliente</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCopyInternalLink">Copiar enlace interno</button>
         <a href="/documents/index.php" class="btn btn-secondary">Volver a la lista</a>
     </div>
 </div>
@@ -221,12 +271,26 @@ try {
 </style>
 
 <script>
-document.getElementById('btnCopyLink')?.addEventListener('click', function () {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url)
-        .then(() => alert('Enlace copiado. Ahora puedes pegarlo en WhatsApp o email.'))
-        .catch(() => alert('No se pudo copiar el enlace.'));
-});
+const publicUrl = <?php echo json_encode($publicUrl); ?>;
+const internalUrl = window.location.href;
+
+const btnPublic = document.getElementById('btnCopyPublicLink');
+if (btnPublic && navigator.clipboard) {
+    btnPublic.addEventListener('click', () => {
+        navigator.clipboard.writeText(publicUrl)
+            .then(() => alert('Enlace para cliente copiado.'))
+            .catch(() => alert('No se pudo copiar el enlace.'));
+    });
+}
+
+const btnInternal = document.getElementById('btnCopyInternalLink');
+if (btnInternal && navigator.clipboard) {
+    btnInternal.addEventListener('click', () => {
+        navigator.clipboard.writeText(internalUrl)
+            .then(() => alert('Enlace interno copiado.'))
+            .catch(() => alert('No se pudo copiar el enlace.'));
+    });
+}
 </script>
 
 <?php
