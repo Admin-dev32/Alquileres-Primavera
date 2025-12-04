@@ -2,11 +2,12 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alquileres Primavera</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTK-ZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sistema interno — Alquileres Primavera</title>
+    <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <script src="/assets/js/bootstrap.bundle.min.js" defer></script>
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
@@ -46,14 +47,14 @@
                 <li class="nav-item"><a class="nav-link" href="/items/index.php">Artículos / Productos</a></li>
                 <li class="nav-item"><a class="nav-link" href="/finance/index.php">Finanzas</a></li>
                 <li class="nav-item"><a class="nav-link" href="/settings/index.php">Configuración</a></li>
-                <?php if (user_has_permission('manage_users')): ?>
+                <?php if (function_exists('user_has_permission') && user_has_permission('manage_users')): ?>
                     <li class="nav-item"><a class="nav-link" href="/users/index.php">Usuarios</a></li>
                 <?php endif; ?>
             </ul>
             <?php if ($user): ?>
-                <ul class="navbar-nav ms-lg-3">
+                <ul class="navbar-nav ms-lg-3 mb-0">
                     <li class="nav-item d-flex align-items-center">
-                        <span class="nav-link">Sesión: <?php echo htmlspecialchars($user['name'] ?? ($user['email'] ?? '')); ?></span>
+                        <span class="nav-link mb-0">Sesión: <?php echo htmlspecialchars($user['name'] ?? ($user['email'] ?? '')); ?></span>
                     </li>
                     <li class="nav-item"><a class="nav-link" href="/auth/logout.php">Cerrar sesión</a></li>
                 </ul>
