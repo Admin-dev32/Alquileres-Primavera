@@ -29,7 +29,7 @@ try {
     $businessAddress = $settings['business_address'] ?? '';
     $businessPhone = $settings['business_phone'] ?? '';
     $businessWhatsapp = $settings['business_whatsapp'] ?? '';
-    $businessLogo = $settings['business_logo'] ?? '';
+    $businessLogo = $settings['logo_path'] ?? ($settings['business_logo'] ?? '');
 
     $docLabel = $document['doc_type'] === 'invoice' ? 'Factura' : 'Estimado';
     $documentDate = $document['document_date'] ?? '';
@@ -67,20 +67,59 @@ try {
     <title><?php echo htmlspecialchars($docLabel . ' ' . ($document['doc_code'] ?? '')); ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+
+        .document-wrapper {
+            max-width: 800px;
+            margin: 0 auto;
+            font-size: 0.9rem;
+        }
+
+        .document-header h1,
+        .document-header h2,
+        .document-header h3 {
+            margin-bottom: 0.25rem;
+        }
+
+        .table-document-items th,
+        .table-document-items td {
+            padding: 0.25rem 0.35rem;
+            font-size: 0.85rem;
+        }
+
+        .document-header,
+        .document-totals {
+            page-break-inside: avoid;
+        }
+
         @media print {
-            .d-print-none {
+            .d-print-none,
+            .alert,
+            footer {
                 display: none !important;
             }
             body {
                 margin: 0;
                 padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .document-wrapper {
+                box-shadow: none !important;
+                border: none !important;
+                width: 100%;
+                max-width: 100%;
+                padding: 8px;
             }
         }
     </style>
 </head>
 <body>
-<div class="container my-4">
-    <div class="row align-items-center mb-3">
+<div class="container my-4 document-wrapper">
+    <div class="row align-items-center mb-3 document-header">
         <div class="col-md-6">
             <?php if (!empty($businessLogo)): ?>
                 <img src="<?php echo htmlspecialchars($businessLogo); ?>" alt="Logo" style="max-height: 70px;" class="mb-2">
@@ -129,7 +168,7 @@ try {
         <div class="card-header fw-bold py-2">Artículos del alquiler</div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-striped table-bordered mb-0">
+                <table class="table table-striped table-bordered mb-0 table-document-items">
                     <thead class="table-light">
                         <tr>
                             <th>Descripción</th>
@@ -168,7 +207,7 @@ try {
         </div>
     </div>
 
-    <div class="row mb-3 gy-2 justify-content-end">
+    <div class="row mb-3 gy-2 justify-content-end document-totals">
         <div class="col-md-6 col-lg-4">
             <div class="card">
                 <div class="card-body py-2">

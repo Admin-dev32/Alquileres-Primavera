@@ -8,7 +8,8 @@ try {
     $columnFixes = [
         'business_email' => "ALTER TABLE settings ADD COLUMN business_email VARCHAR(255) DEFAULT NULL",
         'default_notes' => "ALTER TABLE settings ADD COLUMN default_notes TEXT NULL",
-        'iva_percentage' => "ALTER TABLE settings ADD COLUMN iva_percentage DECIMAL(5,2) NOT NULL DEFAULT 13.00"
+        'iva_percentage' => "ALTER TABLE settings ADD COLUMN iva_percentage DECIMAL(5,2) NOT NULL DEFAULT 13.00",
+        'logo_path' => "ALTER TABLE settings ADD COLUMN logo_path VARCHAR(255) NULL AFTER business_email"
     ];
 
     foreach ($columnFixes as $columnName => $alterSql) {
@@ -41,11 +42,31 @@ try {
         $businessEmail = trim($_POST['business_email'] ?? '');
         $ivaPercentage = trim($_POST['iva_percentage'] ?? '');
         $defaultNotes = trim($_POST['default_notes'] ?? '');
+        $logoPath = $settings['logo_path'] ?? '';
+
+        if (!empty($_FILES['logo']['name']) && ($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $mime = mime_content_type($_FILES['logo']['tmp_name']);
+            $allowed = ['image/png', 'image/jpeg'];
+            if (in_array($mime, $allowed, true)) {
+                $uploadDir = __DIR__ . '/../uploads/logo/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0775, true);
+                }
+                $ext = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
+                $filename = 'logo_' . time() . '.' . $ext;
+                $targetPath = $uploadDir . $filename;
+                if (move_uploaded_file($_FILES['logo']['tmp_name'], $targetPath)) {
+                    $logoPath = '/uploads/logo/' . $filename;
+                }
+            } else {
+                $alertaError = 'El logo debe ser PNG o JPG.';
+            }
+        }
 
         if ($ivaPercentage === '' || !is_numeric($ivaPercentage) || (float)$ivaPercentage < 0) {
             $alertaError = 'Por favor ingresa un IVA válido.';
-        } else {
-            $update = $pdo->prepare('UPDATE settings SET business_name = :business_name, business_address = :business_address, business_phone = :business_phone, business_whatsapp = :business_whatsapp, business_email = :business_email, iva_percentage = :iva_percentage, default_notes = :default_notes WHERE id = :id');
+        } elseif (!$alertaError) {
+            $update = $pdo->prepare('UPDATE settings SET business_name = :business_name, business_address = :business_address, business_phone = :business_phone, business_whatsapp = :business_whatsapp, business_email = :business_email, iva_percentage = :iva_percentage, default_notes = :default_notes, logo_path = :logo_path WHERE id = :id');
             $update->execute([
                 ':business_name' => $businessName,
                 ':business_address' => $businessAddress,
@@ -54,6 +75,7 @@ try {
                 ':business_email' => $businessEmail,
                 ':iva_percentage' => (float)$ivaPercentage,
                 ':default_notes' => $defaultNotes,
+                ':logo_path' => $logoPath,
                 ':id' => $settings['id']
             ]);
             $alertaExito = 'Configuración guardada correctamente.';
@@ -84,7 +106,7 @@ include __DIR__ . '/../templates/header.php';
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <form method="POST" action="">
+            <form method="POST" action="" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label fw-semibold">Nombre del negocio</label>
@@ -110,6 +132,17 @@ include __DIR__ . '/../templates/header.php';
                         <label class="form-label fw-semibold">IVA (%)</label>
                         <input type="number" name="iva_percentage" step="0.01" min="0" class="form-control" value="<?php echo htmlspecialchars($settings['iva_percentage'] ?? '0'); ?>" required>
                     </div>
+                    <div class="col-12">
+                        <label for="logo" class="form-label fw-semibold">Logo (PNG o JPG)</label>
+                        <input type="file" name="logo" id="logo" class="form-control" accept="image/png, image/jpeg">
+                        <div class="form-text">Tamaño recomendado: ancho máximo 300px. Si ya hay un logo, subir uno nuevo lo reemplazará.</div>
+                    </div>
+                    <?php if (!empty($settings['logo_path'])): ?>
+                        <div class="col-12">
+                            <p class="mb-1">Logo actual:</p>
+                            <img src="<?php echo htmlspecialchars($settings['logo_path']); ?>" alt="Logo actual" style="max-height:60px; width:auto;">
+                        </div>
+                    <?php endif; ?>
                     <div class="col-12">
                         <label class="form-label fw-semibold">Notas por defecto para facturas y estimados</label>
                         <textarea name="default_notes" class="form-control" rows="3" placeholder="Texto que aparecerá en tus documentos de forma predeterminada."><?php echo htmlspecialchars($settings['default_notes'] ?? ''); ?></textarea>

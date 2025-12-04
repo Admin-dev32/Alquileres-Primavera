@@ -69,7 +69,7 @@ try {
     $businessAddress = $settings['business_address'] ?? '';
     $businessPhone = $settings['business_phone'] ?? '';
     $businessWhatsapp = $settings['business_whatsapp'] ?? '';
-    $businessLogo = $settings['business_logo'] ?? '';
+    $businessLogo = $settings['logo_path'] ?? ($settings['business_logo'] ?? '');
     $settingsIvaPercent = isset($settings['iva_percentage']) ? (float) $settings['iva_percentage'] : 13.0;
 
     $docLabel = $document['doc_type'] === 'invoice' ? 'FACTURA' : 'ESTIMADO';
@@ -106,11 +106,11 @@ try {
 
     require_once __DIR__ . '/../templates/header.php';
 ?>
-<div class="invoice-page">
+<div class="invoice-page document-wrapper">
     <?php if ($flashMsg === 'error'): ?>
         <div class="alert alert-danger">Ocurrió un error al procesar la solicitud.</div>
     <?php endif; ?>
-    <div class="row mb-3 align-items-center">
+    <div class="row mb-3 align-items-center document-header">
         <div class="col-md-6">
             <?php if (!empty($businessLogo)): ?>
                 <img src="<?php echo htmlspecialchars($businessLogo); ?>" alt="Logo" style="max-height: 70px;" class="mb-2">
@@ -159,7 +159,7 @@ try {
         <div class="card-header fw-bold py-2">Artículos del alquiler</div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-striped table-bordered mb-0">
+                <table class="table table-striped table-bordered mb-0 table-document-items">
                     <thead class="table-light">
                         <tr>
                             <th>Descripción</th>
@@ -198,7 +198,7 @@ try {
         </div>
     </div>
 
-    <div class="row mb-3 gy-2 justify-content-end">
+    <div class="row mb-3 gy-2 justify-content-end document-totals">
         <div class="col-md-6 col-lg-4">
             <div class="card">
                 <div class="card-body py-2">
@@ -251,6 +251,7 @@ try {
                                 <th class="text-end">Monto</th>
                                 <th>Método</th>
                                 <th>Notas</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -260,6 +261,10 @@ try {
                                     <td class="text-end fw-semibold">$<?php echo number_format((float) $payment['amount'], 2); ?></td>
                                     <td><?php echo htmlspecialchars($payment['method']); ?></td>
                                     <td><?php echo nl2br(htmlspecialchars($payment['notes'] ?? '')); ?></td>
+                                    <td class="text-nowrap">
+                                        <a href="/documents/edit_payment.php?id=<?php echo (int) $payment['id']; ?>&document_id=<?php echo (int) $document['id']; ?>" class="btn btn-sm btn-outline-primary">Editar</a>
+                                        <a href="/documents/delete_payment.php?id=<?php echo (int) $payment['id']; ?>&document_id=<?php echo (int) $document['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Seguro que deseas eliminar este pago?');">Eliminar</a>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -330,25 +335,54 @@ try {
 </div>
 
 <style>
+@page {
+    size: A4;
+    margin: 10mm;
+}
+
+.document-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+    font-size: 0.9rem;
+}
+
+.document-header h1,
+.document-header h2,
+.document-header h3 {
+    margin-bottom: 0.25rem;
+}
+
+.table-document-items th,
+.table-document-items td {
+    padding: 0.25rem 0.35rem;
+    font-size: 0.85rem;
+}
+
+.document-header,
+.document-totals {
+    page-break-inside: avoid;
+}
+
 @media print {
+    .no-print,
+    .navbar,
+    .btn,
+    .alert,
+    footer {
+        display: none !important;
+    }
     body {
         margin: 0;
         padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
-    .navbar, .btn, .no-print {
-        display: none !important;
-    }
-    .container, .invoice-page {
+    .document-wrapper {
+        box-shadow: none !important;
+        border: none !important;
         width: 100%;
         max-width: 100%;
         padding: 8px;
-        margin: 0;
-    }
-    table {
-        font-size: 12px;
-    }
-    h1, h2, h3, h4 {
-        margin: 4px 0;
     }
 }
 </style>

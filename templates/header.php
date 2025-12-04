@@ -10,7 +10,30 @@
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
     <div class="container">
-        <a class="navbar-brand fw-bold" href="/index.php">Alquileres Primavera</a>
+        <?php
+        $settingsData = [];
+        $logoPath = '';
+        $brandName = 'Alquileres Primavera';
+        if (isset($pdo)) {
+            try {
+                $settingsQuery = $pdo->query('SELECT * FROM settings LIMIT 1');
+                $settingsData = $settingsQuery->fetch();
+                $logoPath = $settingsData['logo_path'] ?? '';
+                if (empty($logoPath) && !empty($settingsData['business_logo'])) {
+                    $logoPath = $settingsData['business_logo'];
+                }
+                $brandName = $settingsData['business_name'] ?? $brandName;
+            } catch (PDOException $e) {
+                error_log('Error cargando configuración en header: ' . $e->getMessage());
+            }
+        }
+        ?>
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="/index.php">
+            <?php if (!empty($logoPath)): ?>
+                <img src="<?php echo htmlspecialchars($logoPath); ?>" alt="Logo" style="height:40px; width:auto; margin-right:8px;">
+            <?php endif; ?>
+            <span><?php echo htmlspecialchars($brandName); ?></span>
+        </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navPrincipal" aria-controls="navPrincipal" aria-expanded="false" aria-label="Alternar navegación">
             <span class="navbar-toggler-icon"></span>
         </button>

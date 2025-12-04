@@ -10,8 +10,19 @@ $payments = [];
 $expenses = [];
 $error = false;
 
+$q = isset($_GET['q']) ? trim($_GET['q']) : '';
+$like = '%' . $q . '%';
+
 try {
-    $ingresosStmt = $pdo->query('SELECT COALESCE(SUM(p.amount), 0) AS total FROM payments p JOIN documents d ON d.id = p.document_id AND d.is_deleted = 0');
+    $ingresosSql = 'SELECT COALESCE(SUM(p.amount), 0) AS total FROM payments p JOIN documents d ON d.id = p.document_id AND d.is_deleted = 0 WHERE 1=1';
+    $params = [];
+    if ($q !== '') {
+        $ingresosSql .= ' AND (d.client_name LIKE :like_q OR d.doc_code LIKE :like_q OR p.method LIKE :like_q OR p.notes LIKE :like_q)';
+        $params[':like_q'] = $like;
+    }
+
+    $ingresosStmt = $pdo->prepare($ingresosSql);
+    $ingresosStmt->execute($params);
     $summary['ingresos'] = (float) ($ingresosStmt->fetchColumn());
 
     $gastosStmt = $pdo->query('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses');
@@ -19,7 +30,14 @@ try {
 
     $summary['balance'] = $summary['ingresos'] - $summary['gastos'];
 
-    $paymentsStmt = $pdo->query('SELECT p.*, d.doc_code, d.client_name FROM payments p JOIN documents d ON p.document_id = d.id AND d.is_deleted = 0 ORDER BY p.payment_date DESC, p.id DESC LIMIT 10');
+    $paymentsSql = 'SELECT p.*, d.doc_code, d.client_name FROM payments p JOIN documents d ON p.document_id = d.id AND d.is_deleted = 0 WHERE 1=1';
+    if ($q !== '') {
+        $paymentsSql .= ' AND (d.client_name LIKE :like_q OR d.doc_code LIKE :like_q OR p.method LIKE :like_q OR p.notes LIKE :like_q)';
+    }
+    $paymentsSql .= ' ORDER BY p.payment_date DESC, p.id DESC LIMIT 50';
+
+    $paymentsStmt = $pdo->prepare($paymentsSql);
+    $paymentsStmt->execute($params);
     $payments = $paymentsStmt->fetchAll();
 
     $expensesStmt = $pdo->query('SELECT * FROM expenses ORDER BY expense_date DESC, id DESC LIMIT 10');
@@ -39,6 +57,20 @@ require_once __DIR__ . '/../templates/header.php';
     <div class="d-flex gap-2">
         <a href="/finance/add_payment.php" class="btn btn-primary">Registrar pago</a>
         <a href="/finance/add_expense.php" class="btn btn-secondary">Registrar gasto</a>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form class="row g-2" method="GET" action="">
+            <div class="col-md-6 col-lg-4">
+                <label for="q" class="form-label">Buscar</label>
+                <input type="text" name="q" id="q" class="form-control" placeholder="Buscar por cliente, documento, método o notas" value="<?php echo htmlspecialchars($q); ?>">
+            </div>
+            <div class="col-12 d-flex align-items-end">
+                <button type="submit" class="btn btn-secondary">Filtrar</button>
+            </div>
+        </form>
     </div>
 </div>
 

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/config.php';
 
 $type = isset($_GET['type']) ? trim($_GET['type']) : 'all';
 $status = isset($_GET['status']) ? trim($_GET['status']) : 'all';
+$q = isset($_GET['q']) ? trim($_GET['q']) : '';
 
 $allowedTypes = ['estimate', 'invoice'];
 $allowedStatus = ['draft', 'sent', 'paid', 'cancelled'];
@@ -29,6 +30,11 @@ if ($type !== 'all') {
 if ($status !== 'all') {
     $sql .= " AND status = :status";
     $params[':status'] = $status;
+}
+
+if ($q !== '') {
+    $sql .= " AND (client_name LIKE :search OR client_company LIKE :search OR doc_code LIKE :search OR notes LIKE :search)";
+    $params[':search'] = '%' . $q . '%';
 }
 
 $sql .= " ORDER BY created_at DESC";
@@ -76,7 +82,11 @@ require_once __DIR__ . '/../templates/header.php';
           <option value="cancelled" <?php echo $status === 'cancelled' ? 'selected' : ''; ?>>Cancelado</option>
         </select>
       </div>
-      <div class="col-md-4 col-sm-12 d-flex align-items-end">
+      <div class="col-md-4 col-sm-12">
+        <label for="q" class="form-label">Buscar</label>
+        <input type="text" id="q" name="q" class="form-control" placeholder="Cliente, código o notas" value="<?php echo htmlspecialchars($q); ?>">
+      </div>
+      <div class="col-12 d-flex align-items-end">
         <button type="submit" class="btn btn-secondary">Filtrar</button>
       </div>
     </form>
