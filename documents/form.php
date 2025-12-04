@@ -15,17 +15,6 @@ $docType = (isset($_GET['type']) && $_GET['type'] === 'invoice') ? 'invoice' : '
 $title = $docType === 'invoice' ? 'Nueva Factura' : 'Nuevo Estimado';
 $today = date('Y-m-d');
 
-$ivaPercent = 13.00;
-try {
-    $settingsStmt = $pdo->query('SELECT iva_percentage FROM settings LIMIT 1');
-    $settingsRow = $settingsStmt->fetch();
-    if ($settingsRow && isset($settingsRow['iva_percentage'])) {
-        $ivaPercent = (float) $settingsRow['iva_percentage'];
-    }
-} catch (PDOException $e) {
-    $ivaPercent = 13.00;
-}
-
 $products = [];
 try {
     $productsStmt = $pdo->query('SELECT id, name, unit_price AS price FROM items ORDER BY name ASC');
@@ -34,50 +23,50 @@ try {
     $products = [];
 }
 
- $documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
- $editing = false;
- $documentData = [
-     'client_name' => '',
-     'client_company' => '',
-     'client_address' => '',
-     'client_phone' => '',
-     'representative' => '',
-     'event_type' => '',
-     'document_date' => $today,
-     'rental_end_date' => '',
-     'notes' => '',
- ];
- $existingItems = [];
+$documentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+$editing = false;
+$documentData = [
+    'client_name' => '',
+    'client_company' => '',
+    'client_address' => '',
+    'client_phone' => '',
+    'representative' => '',
+    'event_type' => '',
+    'document_date' => $today,
+    'rental_end_date' => '',
+    'notes' => '',
+];
+$existingItems = [];
 
- if ($documentId) {
-     try {
-         $docStmt = $pdo->prepare('SELECT * FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
-         $docStmt->execute([':id' => $documentId]);
-         $found = $docStmt->fetch();
-         if ($found) {
-             $editing = true;
-             $docType = $found['doc_type'];
-             $title = $docType === 'invoice' ? 'Editar Factura' : 'Editar Estimado';
-             $documentData = [
-                 'client_name' => $found['client_name'] ?? '',
-                 'client_company' => $found['client_company'] ?? '',
-                 'client_address' => $found['client_address'] ?? '',
-                 'client_phone' => $found['client_phone'] ?? '',
-                 'representative' => $found['representative'] ?? '',
-                 'event_type' => $found['event_type'] ?? '',
-                 'document_date' => $found['document_date'] ?? $today,
-                 'rental_end_date' => $found['rental_end_date'] ?? '',
-                 'notes' => $found['notes'] ?? '',
-             ];
+if ($documentId) {
+    try {
+        $docStmt = $pdo->prepare('SELECT * FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
+        $docStmt->execute([':id' => $documentId]);
+        $found = $docStmt->fetch();
+        if ($found) {
+            $editing = true;
+            $docType = $found['doc_type'];
+            $title = $docType === 'invoice' ? 'Editar Factura' : 'Editar Estimado';
+            $documentData = [
+                'client_name' => $found['client_name'] ?? '',
+                'client_company' => $found['client_company'] ?? '',
+                'client_address' => $found['client_address'] ?? '',
+                'client_phone' => $found['client_phone'] ?? '',
+                'representative' => $found['representative'] ?? '',
+                'event_type' => $found['event_type'] ?? '',
+                'document_date' => $found['document_date'] ?? $today,
+                'rental_end_date' => $found['rental_end_date'] ?? '',
+                'notes' => $found['notes'] ?? '',
+            ];
 
-             $itemsLoadStmt = $pdo->prepare('SELECT item_name, quantity, unit_price, rental_days FROM document_items WHERE document_id = :id ORDER BY id ASC');
-             $itemsLoadStmt->execute([':id' => $documentId]);
-             $existingItems = $itemsLoadStmt->fetchAll();
-         }
-     } catch (PDOException $e) {
-         // si falla la carga seguimos con formulario vacío
-     }
- }
+            $itemsLoadStmt = $pdo->prepare('SELECT item_name, quantity, unit_price, rental_days FROM document_items WHERE document_id = :id ORDER BY id ASC');
+            $itemsLoadStmt->execute([':id' => $documentId]);
+            $existingItems = $itemsLoadStmt->fetchAll();
+        }
+    } catch (PDOException $e) {
+        // si falla la carga seguimos con formulario vacío
+    }
+}
 
 require_once __DIR__ . '/../templates/header.php';
 ?>
@@ -171,18 +160,11 @@ require_once __DIR__ . '/../templates/header.php';
 
   <div class="card mb-4 shadow-sm">
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="card-title mb-0">Totales</h5>
-        <small class="text-muted">IVA aplicado: <?php echo number_format($ivaPercent, 2); ?>% (editable en Configuración)</small>
-      </div>
+      <h5 class="card-title mb-3">Totales</h5>
       <div class="row justify-content-end g-3">
         <div class="col-md-4">
           <label class="form-label fw-semibold" for="subtotal">Subtotal</label>
           <input type="number" id="subtotal" name="subtotal" class="form-control form-control-lg text-end" step="0.01" readonly>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label fw-semibold" for="tax">IVA</label>
-          <input type="number" id="tax" name="tax" class="form-control form-control-lg text-end" step="0.01" readonly>
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold" for="total">Total</label>
@@ -208,7 +190,6 @@ require_once __DIR__ . '/../templates/header.php';
 </form>
 
 <script>
-  const IVA_PERCENT = <?php echo json_encode($ivaPercent); ?>;
   const PRODUCT_LIST = <?php echo json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
   const EXISTING_ITEMS = <?php echo json_encode($existingItems, JSON_UNESCAPED_UNICODE); ?>;
   let itemIndex = 0;
@@ -322,7 +303,6 @@ require_once __DIR__ . '/../templates/header.php';
   function recalculateTotals() {
     const tbody = document.getElementById('items-body');
     const subtotalInput = document.getElementById('subtotal');
-    const taxInput = document.getElementById('tax');
     const totalInput = document.getElementById('total');
     let subtotal = 0;
 
@@ -338,12 +318,8 @@ require_once __DIR__ . '/../templates/header.php';
       subtotal += lineTotal;
     });
 
-    const tax = subtotal * (IVA_PERCENT / 100);
-    const total = subtotal + tax;
-
     subtotalInput.value = subtotal.toFixed(2);
-    taxInput.value = tax.toFixed(2);
-    totalInput.value = total.toFixed(2);
+    totalInput.value = subtotal.toFixed(2);
   }
 
   function recalcDocumentTotals() {

@@ -42,7 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar sesión - Alquileres Primavera</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body class="bg-light">
 <div class="container d-flex align-items-center justify-content-center" style="min-height: 100vh;">
@@ -66,5 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 </div>
+<script src="/assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

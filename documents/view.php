@@ -73,7 +73,6 @@ try {
     $businessPhone = $settings['business_phone'] ?? '';
     $businessWhatsapp = $settings['business_whatsapp'] ?? '';
     $businessLogo = $settings['logo_path'] ?? ($settings['business_logo'] ?? '');
-    $settingsIvaPercent = isset($settings['iva_percentage']) ? (float) $settings['iva_percentage'] : 13.0;
 
     $docLabel = $document['doc_type'] === 'invoice' ? 'FACTURA' : 'ESTIMADO';
     $statusClass = $document['doc_type'] === 'invoice' ? 'text-danger' : 'text-primary';
@@ -98,12 +97,8 @@ try {
     }
     $calculatedSubtotal = round($calculatedSubtotal, 2);
 
-    $ivaPercent = ($document['subtotal'] ?? 0) > 0
-        ? round(((float) $document['tax'] / max((float) $document['subtotal'], 0.01)) * 100, 2)
-        : $settingsIvaPercent;
     $subtotalDisplay = $calculatedSubtotal > 0 ? $calculatedSubtotal : (float) ($document['subtotal'] ?? 0);
-    $taxDisplay = ($document['tax'] ?? null) !== null ? (float) $document['tax'] : round($subtotalDisplay * ($ivaPercent / 100), 2);
-    $totalDisplay = ($document['total'] ?? null) !== null ? (float) $document['total'] : round($subtotalDisplay + $taxDisplay, 2);
+    $totalDisplay = $subtotalDisplay;
     $saldoPendiente = max(0, $totalDisplay - $paymentsTotal);
     $flashMsg = isset($_GET['msg']) ? trim($_GET['msg']) : '';
 
@@ -208,10 +203,6 @@ try {
                     <div class="d-flex justify-content-between mb-1">
                         <span class="fw-bold">Subtotal:</span>
                         <span>$<?php echo number_format($subtotalDisplay, 2); ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="fw-bold">IVA (<?php echo number_format($ivaPercent, 2); ?>%):</span>
-                        <span>$<?php echo number_format($taxDisplay, 2); ?></span>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span class="fw-bold">Total:</span>

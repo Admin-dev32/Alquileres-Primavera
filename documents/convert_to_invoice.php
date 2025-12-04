@@ -27,6 +27,13 @@ try {
     $itemsStmt->execute([':id' => $documentId]);
     $items = $itemsStmt->fetchAll();
 
+    $subtotal = 0.0;
+    foreach ($items as $item) {
+        $subtotal += (float) ($item['line_total'] ?? 0);
+    }
+    $subtotal = round($subtotal, 2);
+    $total = $subtotal;
+
     // Next invoice number
     $maxStmt = $pdo->query('SELECT MAX(doc_number) AS max_num FROM documents WHERE doc_type = "invoice"');
     $maxNum = $maxStmt->fetchColumn();
@@ -63,15 +70,15 @@ try {
         ':representative' => $estimate['representative'],
         ':event_type' => $estimate['event_type'],
         ':rental_end_date' => $estimate['rental_end_date'],
-        ':subtotal' => $estimate['subtotal'],
-        ':tax' => $estimate['tax'],
-        ':total' => $estimate['total'],
+        ':subtotal' => $subtotal,
+        ':tax' => 0,
+        ':total' => $total,
         ':notes' => $estimate['notes'],
     ]);
 
     $newDocumentId = $pdo->lastInsertId();
 
-    $insertItem = $pdo->prepare('INSERT INTO document_items (document_id, item_name, unit_price, quantity, line_total) VALUES (:document_id, :item_name, :unit_price, :quantity, :line_total)');
+    $insertItem = $pdo->prepare('INSERT INTO document_items (document_id, item_name, unit_price, quantity, rental_days, line_total) VALUES (:document_id, :item_name, :unit_price, :quantity, :rental_days, :line_total)');
 
     foreach ($items as $item) {
         $insertItem->execute([
@@ -79,6 +86,7 @@ try {
             ':item_name' => $item['item_name'],
             ':unit_price' => $item['unit_price'],
             ':quantity' => $item['quantity'],
+            ':rental_days' => $item['rental_days'] ?? 1,
             ':line_total' => $item['line_total'],
         ]);
     }

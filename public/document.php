@@ -48,11 +48,7 @@ try {
 
     $calculatedSubtotal = round($calculatedSubtotal, 2);
     $subtotalDisplay = $calculatedSubtotal > 0 ? $calculatedSubtotal : (float) ($document['subtotal'] ?? 0);
-    $ivaPercent = ($document['subtotal'] ?? 0) > 0
-        ? round(((float) $document['tax'] / max((float) $document['subtotal'], 0.01)) * 100, 2)
-        : 13.0;
-    $taxDisplay = ($document['tax'] ?? null) !== null ? (float) $document['tax'] : round($subtotalDisplay * ($ivaPercent / 100), 2);
-    $totalDisplay = ($document['total'] ?? null) !== null ? (float) $document['total'] : round($subtotalDisplay + $taxDisplay, 2);
+    $totalDisplay = $subtotalDisplay;
 } catch (PDOException $e) {
     http_response_code(500);
     echo 'Ocurrió un error al cargar el documento.';
@@ -65,7 +61,8 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?php echo htmlspecialchars($docLabel . ' ' . ($document['doc_code'] ?? '')); ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/css/app.css">
     <style>
         @page {
             size: A4;
@@ -214,10 +211,6 @@ try {
                     <div class="d-flex justify-content-between mb-1">
                         <span class="fw-bold">Subtotal:</span>
                         <span>$<?php echo number_format($subtotalDisplay, 2); ?></span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="fw-bold">IVA:</span>
-                        <span>$<?php echo number_format($taxDisplay, 2); ?></span>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span class="fw-bold">Total:</span>

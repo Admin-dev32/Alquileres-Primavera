@@ -40,7 +40,7 @@ try {
         if ($paymentDate === '' || $amount <= 0) {
             $alertError = 'Por favor completa los campos obligatorios.';
         } else {
-            $docStmt = $pdo->prepare('SELECT id, total FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
+            $docStmt = $pdo->prepare('SELECT id, subtotal, total FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
             $docStmt->execute([':id' => $documentId]);
             $document = $docStmt->fetch();
 
@@ -55,7 +55,8 @@ try {
                 ':payment_id' => $paymentId,
             ]);
             $pagadoSinActual = (float) $otrosPagosStmt->fetchColumn();
-            $saldoPendiente = (float) $document['total'] - $pagadoSinActual;
+            $documentTotal = isset($document['subtotal']) ? (float) $document['subtotal'] : (float) $document['total'];
+            $saldoPendiente = $documentTotal - $pagadoSinActual;
 
             if ($amount > $saldoPendiente) {
                 $amount = $saldoPendiente;
@@ -79,7 +80,7 @@ try {
                 $pagadoTotal = (float) $totalPagadoStmt->fetchColumn();
 
                 $status = 'draft';
-                if ($pagadoTotal >= (float) $document['total']) {
+                if ($pagadoTotal >= $documentTotal) {
                     $status = 'paid';
                 } elseif ($pagadoTotal > 0) {
                     $status = 'sent';

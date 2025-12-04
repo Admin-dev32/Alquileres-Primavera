@@ -58,17 +58,6 @@ try {
         $itemsPosted = [];
     }
 
-    $ivaPercent = 13.0;
-    try {
-        $ivaStmt = $pdo->query('SELECT iva_percentage FROM settings LIMIT 1');
-        $ivaRow = $ivaStmt->fetch();
-        if ($ivaRow && isset($ivaRow['iva_percentage'])) {
-            $ivaPercent = (float) $ivaRow['iva_percentage'];
-        }
-    } catch (PDOException $e) {
-        $ivaPercent = 13.0;
-    }
-
     $validItems = [];
     $subtotal = 0.0;
 
@@ -100,8 +89,8 @@ try {
     }
 
     $subtotal = round($subtotal, 2);
-    $tax = round($subtotal * ($ivaPercent / 100), 2);
-    $total = round($subtotal + $tax, 2);
+    $tax = 0.0;
+    $total = $subtotal;
 
     $pdo->beginTransaction();
 

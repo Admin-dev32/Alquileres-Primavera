@@ -21,7 +21,7 @@ if (!$documentId) {
 }
 
 try {
-    $docStmt = $pdo->prepare('SELECT id, total FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
+    $docStmt = $pdo->prepare('SELECT id, subtotal, total FROM documents WHERE id = :id AND is_deleted = 0 LIMIT 1');
     $docStmt->execute([':id' => $documentId]);
     $document = $docStmt->fetch();
 
@@ -40,7 +40,8 @@ try {
     $paymentsTotalStmt->execute([':id' => $documentId]);
     $pagadoActual = (float) $paymentsTotalStmt->fetchColumn();
 
-    $saldoPendiente = (float) $document['total'] - $pagadoActual;
+    $documentTotal = isset($document['subtotal']) ? (float) $document['subtotal'] : (float) $document['total'];
+    $saldoPendiente = $documentTotal - $pagadoActual;
     if ($amount > $saldoPendiente) {
         $amount = $saldoPendiente;
     }
@@ -63,7 +64,7 @@ try {
     $pagadoTotal = (float) $paymentsTotalStmt->fetchColumn();
 
     $statusToSet = 'draft';
-    if ($pagadoTotal >= (float) $document['total']) {
+    if ($pagadoTotal >= $documentTotal) {
         $statusToSet = 'paid';
     } elseif ($pagadoTotal > 0) {
         $statusToSet = 'sent';
